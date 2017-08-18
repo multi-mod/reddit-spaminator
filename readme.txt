@@ -16,4 +16,4 @@ reddit anti-spam bot
 
 	report_percentage = 20
 
-Watchers tells the bot which anti-spam measures to use. 'domain' checks for suspicious domain activity, 'media' is the media channel spam check system, and 'submission' check for domain submissions at too high of a percentage. For the domain and user whitelist, format the list as ['item1','item2', ...].
+'watchers' tells the bot which anti-spam measures to use. 'domain' checks for suspicious domain activity, 'media' is the media channel spam check system, and 'submission' check for domain submissions at too high of a percentage. For the domain and user whitelist, format the list as ['item1','item2', ...]. report_percentage is the percentage at which a user with more than 10 total submissions will be reported if their submissions for a domain exceed that percentage.
