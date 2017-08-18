@@ -3,6 +3,7 @@ import prawcore
 import time
 import ast
 import os
+from collections import deque
 
 #initializing praw
 reddit = praw.Reddit(client_id='',
@@ -12,42 +13,9 @@ reddit = praw.Reddit(client_id='',
                      username='')
 
 #functions
-def percentage_check(total_submissions, domain_submissions, report, remove):
-    
-    if total_submissions < 3:
-        return 'pass'
-    
-    percentage = int((domain_submissions / total_submissions) * 100)
-    
-    if remove == False:
-        if percentage < report:
-            return 'pass'
-    if remove != False:
-        if percentage < report and percentage < remove:
-            return 'pass'
-    
-    if total_submissions >= 3 and total_submissions <= 5:
-        if percentage >= 60:
-            return 'report'
-    
-    elif total_submissions > 5 and total_submissions < 10:
-        if percentage >= 50:
-            return 'report'
-    
-    elif total_submissions >= 10:
-        if remove == False:
-            if percentage >= report:
-                return 'report'
-        if remove != False:
-            if percentage >= remove:
-                return 'remove'
-    
-    else:
-        return 'pass'
-
 def subreddit_list():
 
-    subreddit_list = os.getcwd() + '\subreddit_list.txt'
+    subreddit_list = os.path.join(os.getcwd(), 'subreddit_list.txt')
 
     with open(subreddit_list) as f:
         subs = [x for x in f][0]
@@ -56,79 +24,65 @@ def subreddit_list():
     return(subs)
     
 #classes
-class spam_check:
+class SpamCheck(object):
       
-    def __init__(self):
-        
-        self.log = {}
-        self.settings = {}
-    
-    def get_settings(self, subreddit):
+    def __init__(self, subreddit):
         
         self.subreddit = subreddit
-        self.settings[self.subreddit] = {}
+        self.log = deque(maxlen=50)
+    
+    def get_settings(self):
         
         try:
-            self.wiki = reddit.subreddit(self.subreddit).wiki['spaminator'].content_md
-            self.exists = True
+            wiki = reddit.subreddit(self.subreddit).wiki['spaminator'].content_md
         except prawcore.exceptions.NotFound:
-            self.exists = False
+            pass
         
-        if self.exists is True:
-            self.wiki = self.wiki.split('\n')
-            self.wiki = [x.strip('\r') for x in self.wiki if x != '\r']
-            
-            try:
-                self.settings[self.subreddit]['domain_whitelist'] = ast.literal_eval([x.split(' = ') for x in self.wiki if x.startswith('domain_whitelist') is True][0][1])
-            except IndexError:
-                self.settings[self.subreddit]['domain_whitelist'] = []
-            try:
-                self.settings[self.subreddit]['user_whitelist'] = ast.literal_eval([x.split(' = ') for x in self.wiki if x.startswith('user_whitelist') is True][0][1])
-            except IndexError:
-                self.settings[self.subreddit]['user_whitelist'] = []
-            try:
-                self.settings[self.subreddit]['report_percentage'] = int([x.split(' = ') for x in self.wiki if x.startswith('report_percentage') is True][0][1])
-            except IndexError:
-                self.settings[self.subreddit]['report_percentage'] = 20
-            try:
-                self.settings[self.subreddit]['watchers'] = ast.literal_eval([x.split(' = ') for x in self.wiki if x.startswith('watchers') is True][0][1])
-            except IndexError:
-                self.settings[self.subreddit]['watchers'] = ['submission','media','domain']
-            try:
-                self.settings[self.subreddit]['remove_percentage'] = int([x.split(' = ') for x in self.wiki if x.startswith('remove_percentage') is True][0][1])
-            except IndexError:
-                self.settings[self.subreddit]['remove_percentage'] = False
+        wiki_settings = {}
+        for line in wiki:
+            setting_name, _, value = line.partition('=')
+            wiki_settings[setting_name.strip()] = ast.literal_eval(value.strip())
+
+        default_settings = {
+            'domain_whitelist': [],
+            'user_whitelist': [],
+            'report_percentage': 20,
+            'remove_percentage': None,
+            'watchers': ['submission', 'media', 'domain'],
+        }
+
+        self.settings = {
+            key: wiki_settings.get(key, default_settings[key])
+            for key in default_settings
+        }
         
-        if self.exists is False:
-            self.settings[self.subreddit] = {}
-            self.settings[self.subreddit]['domain_whitelist'] = []
-            self.settings[self.subreddit]['user_whitelist'] = []
-            self.settings[self.subreddit]['report_percentage'] = 20
-            self.settings[self.subreddit]['remove_percentage'] = False
-            self.settings[self.subreddit]['watchers'] = ['submission','media','domain']
+        for setting in ['domain_whitelist','user_whitelist','watchers']:
+            self.settings[setting] = set(self.settings[setting])
 
     def new_posts(self, limit):
         
-        self.limit = limit
+        limit = limit
         
-        try:
-            self.log[self.subreddit]
-        except KeyError:
-            self.log[self.subreddit] = []
-        
-        self.new = reddit.subreddit(self.subreddit).new(limit=self.limit)
-        self.new = [x for x in self.new if x.id not in self.log[self.subreddit]]
+        new = reddit.subreddit(self.subreddit).new(limit=limit)
+        self.new = [x for x in new if x.id not in self.log]
 
-        self.log[self.subreddit].extend([x.id for x in self.new])
-        if len(self.log[self.subreddit]) > 50:
-            self.log[self.subreddit] = self.log[self.subreddit][:-50]
+        self.log.extend([x.id for x in self.new])
+
+    def call_watchers(self, limit):
+        
+        limit=limit
+        watchers = self.settings['watchers']
+        
+        if 'submission' in watchers:
+            self.submission_spam(limit=limit)
+        if 'media' in watchers:
+            self.media_spam(limit=limit)
+        if 'domain' in watchers:
+            self.suspicious_domain(limit=limit)
     
     def submission_spam(self, limit):
         
-        self.limit = limit
-        
-        if 'submission' not in self.settings[self.subreddit]['watchers']:
-            return
+        limit = limit
         
         for post in self.new:
             
@@ -136,46 +90,34 @@ class spam_check:
                 reddit.redditor(post.author.name).id
             except AttributeError:
                 continue
-            if post.domain in self.settings[self.subreddit]['domain_whitelist']:
+            if post.domain in self.settings['domain_whitelist']:
                 continue
-            if post.author.name in self.settings[self.subreddit]['user_whitelist']:
+            if post.author.name in self.settings['user_whitelist']:
                 continue
             if post.is_self is True:
                 continue
             
-            self.author_submissions = post.author.submissions.new(limit=self.limit)
-            self.author_submissions = [x for x in self.author_submissions]
+            author_submissions = list(post.author.submissions.new(limit=limit))
             
-            if len(self.author_submissions) == 0:
+            if len(author_submissions) == 0:
                 continue
             
-            self.submitted_domains = [x.domain for x in self.author_submissions]
+            self.total_submissions = len(author_submissions)
+            submitted_domains = [x.domain for x in author_submissions]
+            domain_submissions = submitted_domains.count(post.domain)
             
-            self.total_submissions = len(self.author_submissions)
-            self.domain_submissions = self.submitted_domains.count(post.domain)
+            self.percentage = int((domain_submissions / self.total_submissions) * 100)
             
-            self.check = percentage_check(self.total_submissions,
-                                          self.domain_submissions,
-                                          self.settings[self.subreddit]['report_percentage'],
-                                          self.settings[self.subreddit]['remove_percentage'])
-            
-            if self.check == 'pass':
-                continue
-            
-            if self.check == 'report':
-                self.report_reason = 'domain spam: ' + post.domain + ' ' + str(int((self.domain_submissions / self.total_submissions)*100)) + '%'
-                #print('/u/' + post.author.name + ', ' + self.report_reason)
-                post.report(reason=self.report_reason)
-            
-            if self.check == 'remove':
+            if self.should_report():
+                report_reason = 'domain spam: ' + post.domain + ' ' + str(self.percentage) + '%'
+                post.report(reason=report_reason)
+                        
+            if self.should_remove():
                 pass
     
     def media_spam(self, limit):
         
-        self.limit = limit
-        
-        if 'media' not in self.settings[self.subreddit]['watchers']:
-            return
+        limit = limit
         
         for post in self.new:
             
@@ -185,7 +127,7 @@ class spam_check:
                 continue
             if post.is_self is True:
                 continue
-            if post.author.name in self.settings[self.subreddit]['user_whitelist']:
+            if post.author.name in self.settings['user_whitelist']:
                 continue
             if post.media is None:
                 continue
@@ -194,51 +136,40 @@ class spam_check:
             except KeyError:
                 continue
 
-            self.author_submissions = post.author.submissions.new(limit=self.limit)
-            self.author_submissions = [x for x in self.author_submissions]
+            author_submissions = list(post.author.submissions.new(limit=self.limit))
             
-            if len(self.author_submissions) == 0:
+            if len(author_submissions) == 0:
                 continue
             
-            self.media_submissions = [x.media for x in self.author_submissions if x.media is not None]
+            media_submissions = [x.media for x in author_submissions if x.media is not None]
             
-            if len(self.media_submissions) == 0:
+            if len(media_submissions) == 0:
                 continue
             
-            self.media_authors = []
-            for submission in self.media_submissions:
+            media_authors = []
+            for submission in media_submissions:
                 try:
-                    self.media_authors.append(submission['oembed']['author_name'])
+                    media_authors.append(submission['oembed']['author_name'])
                 except KeyError:
                     pass
                 except TypeError:
                     pass
             
-            self.total_submissions = len(self.author_submissions)
-            self.media_author_submissions = self.media_authors.count(post.media['oembed']['author_name'])
+            self.total_submissions = len(author_submissions)
+            media_author_submissions = media_authors.count(post.media['oembed']['author_name'])
             
-            self.check = percentage_check(self.total_submissions,
-                                          self.media_author_submissions,
-                                          self.settings[self.subreddit]['report_percentage'],
-                                          self.settings[self.subreddit]['remove_percentage'])
+            self.percentage = int((media_author_submissions / self.total_submissions) * 100)
             
-            if self.check == 'pass':
-                continue
-            
-            if self.check == 'report':
-                self.report_reason = 'media spam: ' + post.media['oembed']['author_name'] + ' ' + str(int((self.media_author_submissions / self.total_submissions)*100)) + '%'
-                #print('/u/' + post.author.name + ', ' + self.report_reason)
+            if self.should_report():
+                self.report_reason = 'media spam: ' + post.media['oembed']['author_name'] + ' ' + str(self.percentage) + '%'
                 post.report(reason=self.report_reason)
-            
-            if self.check == 'remove':
+                        
+            if self.should_remove():
                 pass
     
     def suspicious_domain(self, limit):
         
-        self.limit = limit
-        
-        if 'domain' not in self.settings[self.subreddit]['watchers']:
-            return
+        limit = limit
         
         for post in self.new:
             
@@ -248,62 +179,91 @@ class spam_check:
                 continue
             if post.is_self is True:
                 continue
-            if post.author.name in self.settings[self.subreddit]['user_whitelist']:
+            if post.author.name in self.settings['user_whitelist']:
                 continue     
-            if post.domain in self.settings[self.subreddit]['domain_whitelist']:
+            if post.domain in self.settings['domain_whitelist']:
                 continue
             
-            self.domain_new = reddit.domain(post.domain).new(limit=self.limit)
-            self.domain_new = [x for x in self.domain_new]
+            domain_new = list(reddit.domain(post.domain).new(limit=self.limit))
             
-            if len(self.domain_new) == 0:
+            if len(domain_new) == 0:
                 continue
             
-            self.domain_authors = [x.author.name for x in self.domain_new if x.author is not None]
+            domain_authors = [x.author.name for x in domain_new if x.author is not None]
             
-            self.author_domain_connection = self.domain_authors.count(post.author.name)
-            self.domain_submission_numbers = len(self.domain_new)
-            self.percentage = int((self.author_domain_connection / self.domain_submission_numbers)*100)
+            author_domain_connection = domain_authors.count(post.author.name)
+            domain_submission_numbers = len(domain_new)
             
-            if self.domain_submission_numbers >= 3 and self.domain_submission_numbers <= 5:
-                if self.percentage == 100:
-                    self.report_reason = 'domain mostly submitted by user: ' + str(self.percentage) + '%'
-                    #print('/u/' + post.author.name + ', ' + self.report_reason)
-                    post.report(reason=self.report_reason)
+            percentage = int((author_domain_connection / domain_submission_numbers)*100)
             
-            if self.domain_submission_numbers > 5:
-                if self.percentage >= 50:
-                    self.report_reason = 'domain mostly submitted by user: ' + str(self.percentage) + '%'
-                    #print('/u/' + post.author.name + ', ' + self.report_reason)
-                    post.report(reason=self.report_reason)
+            if 3 <= domain_submission_numbers <= 5:
+                if percentage == 100:
+                    report_reason = 'domain mostly submitted by user: ' + str(percentage) + '%'
+                    post.report(reason=report_reason)
             
+            if domain_submission_numbers > 5:
+                if percentage >= 50:
+                    report_reason = 'domain mostly submitted by user: ' + str(percentage) + '%'
+                    post.report(reason=report_reason)
+                    
+    def should_report(self):
+        
+        if 3 <= self.total_submissions <= 5:
+            if self.percentage >= 60:
+                return True
+        
+        elif 5 < self.total_submissions < 10:
+            if self.percentage >= 50:
+                return True
+        
+        elif self.total_submissions >= 10:
+            if self.settings['remove_percentage'] is None:
+                if self.percentage >= self.settings['report_percentage']:
+                    return True
+            if self.settings['remove_percentage'] is not None:
+                if self.percentage >= self.settings['remove_percentage']:
+                    return False
+        
+        else:
+            return False
+
+    def should_remove(self):
+        
+        if self.settings['remove_percentage'] is None:
+            return False
+        
+        elif self.total_submissions >= 10:
+            if self.percentage >= self.settings['remove_percentage']:
+                return True
+        
+        else:
+            return False
         
 if __name__ == '__main__':
 
-    analysis = spam_check()
+    subreddits = None
     
     while True:
         
         try:
-        
-            subreddits = subreddit_list()
+            if subreddits is None:
+                subreddits = subreddit_list()
+                spam_checkers = {subreddit: SpamCheck(subreddit) for subreddit in subreddits}
+            else:
+                new_list_check = subreddit_list()
+                if new_list_check == subreddits:
+                    continue
+                spam_checkers = {subreddit: SpamCheck(subreddit) for subreddit in subreddits}
     
             for subreddit in subreddits:
-                analysis.get_settings(subreddit)
-                analysis.new_posts(limit=25)
-                analysis.submission_spam(limit=1000)
-                analysis.media_spam(limit=1000)
-                analysis.suspicious_domain(limit=1000)
+                spam_checkers[subreddit].get_settings(subreddit)
+                spam_checkers[subreddit].new_posts(limit=25)
+                spam_checkers[subreddit].call_watchers(limit=1000)
                 time.sleep(10)
         
-        except Exception:
-           print('general exception, sleeping 60s')
-           time.sleep(60)
+        except KeyboardInterrupt:
+           raise
         
-        except praw.exceptions.PRAWException:
-            print('praw exception, sleeping 60s')
-            time.sleep(60)
-        
-        except prawcore.PrawcoreException:
-            print('prawcore exception, sleeping 60s')
+        except:
+            print('exception, sleeping 60s')
             time.sleep(60)
