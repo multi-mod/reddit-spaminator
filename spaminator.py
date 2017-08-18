@@ -136,7 +136,7 @@ class SpamCheck(object):
             except KeyError:
                 continue
 
-            author_submissions = list(post.author.submissions.new(limit=self.limit))
+            author_submissions = list(post.author.submissions.new(limit=limit))
             
             if len(author_submissions) == 0:
                 continue
@@ -184,7 +184,7 @@ class SpamCheck(object):
             if post.domain in self.settings['domain_whitelist']:
                 continue
             
-            domain_new = list(reddit.domain(post.domain).new(limit=self.limit))
+            domain_new = list(reddit.domain(post.domain).new(limit=limit))
             
             if len(domain_new) == 0:
                 continue
