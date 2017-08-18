@@ -251,9 +251,8 @@ if __name__ == '__main__':
                 spam_checkers = {subreddit: SpamCheck(subreddit) for subreddit in subreddits}
             else:
                 new_list_check = subreddit_list()
-                if new_list_check == subreddits:
-                    continue
-                spam_checkers = {subreddit: SpamCheck(subreddit) for subreddit in subreddits}
+                if new_list_check != subreddits:
+                    spam_checkers = {subreddit: SpamCheck(subreddit) for subreddit in subreddits}
     
             for subreddit in subreddits:
                 spam_checkers[subreddit].get_settings(subreddit)
