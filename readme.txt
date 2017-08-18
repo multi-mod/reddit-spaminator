@@ -1,5 +1,10 @@
-reddit anti-spam bot
+reddit anti-spam bot (the spaminator)
 
+Contains 3 configurable anti-spam bots. The submission watcher will look for people submitting a domain more than a certain percentage. The media watcher ensures people are not spamming a particular media channel. Finally, the domain watcher looks for suspicious domain activity (ie. domain being mostly submitted by a user).
+
+The bot can monitor multiple subreddits simultaneously. Wiki configurable options include the ability to select which bots you want ot run, a user and domain whitelist, and a configurable percentage of when to report posts.
+
+how to run the bot:
 1) in spaminator.py add your account credentials
 
 2) in the same directory as the bot, add a text file named "subreddit_list.txt" that contains the subreddits you want the bot to monitor in the following format:
