@@ -32,16 +32,6 @@ class SpamCheck(object):
         self.log = deque(maxlen=50)
     
     def get_settings(self):
-        
-        try:
-            wiki = reddit.subreddit(self.subreddit).wiki['spaminator'].content_md
-        except prawcore.exceptions.NotFound:
-            pass
-        
-        wiki_settings = {}
-        for line in wiki:
-            setting_name, _, value = line.partition('=')
-            wiki_settings[setting_name.strip()] = ast.literal_eval(value.strip())
 
         default_settings = {
             'domain_whitelist': [],
@@ -50,12 +40,27 @@ class SpamCheck(object):
             'remove_percentage': None,
             'watchers': ['submission', 'media', 'domain'],
         }
-
-        self.settings = {
-            key: wiki_settings.get(key, default_settings[key])
-            for key in default_settings
-        }
         
+        wiki_settings = {}
+        
+        try:
+            wiki = reddit.subreddit(self.subreddit).wiki['spaminator'].content_md
+            for line in wiki:
+                setting_name, _, value = line.partition('=')
+                wiki_settings[setting_name.strip()] = ast.literal_eval(value.strip())
+            
+            self.settings = {
+                    key: wiki_settings.get(key, default_settings[key])
+                    for key in default_settings
+            }
+            
+        except prawcore.exceptions.NotFound:
+            self.settings = {
+                key: wiki_settings.get(key, default_settings[key])
+                for key in default_settings
+            }
+        
+
         for setting in ['domain_whitelist','user_whitelist','watchers']:
             self.settings[setting] = set(self.settings[setting])
 
