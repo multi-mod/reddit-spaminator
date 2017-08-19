@@ -166,8 +166,8 @@ class SpamCheck(object):
             self.percentage = int((media_author_submissions / self.total_submissions) * 100)
             
             if self.should_report():
-                self.report_reason = 'media spam: ' + post.media['oembed']['author_name'] + ' ' + str(self.percentage) + '%'
-                post.report(reason=self.report_reason)
+                report_reason = 'media spam: ' + post.media['oembed']['author_name'] + ' ' + str(self.percentage) + '%'
+                post.report(reason=report_reason)
                         
             if self.should_remove():
                 pass
@@ -260,7 +260,7 @@ if __name__ == '__main__':
                     spam_checkers = {subreddit: SpamCheck(subreddit) for subreddit in subreddits}
     
             for subreddit in subreddits:
-                spam_checkers[subreddit].get_settings(subreddit)
+                spam_checkers[subreddit].get_settings()
                 spam_checkers[subreddit].new_posts(limit=25)
                 spam_checkers[subreddit].call_watchers(limit=1000)
                 time.sleep(10)
