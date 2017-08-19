@@ -49,17 +49,13 @@ class SpamCheck(object):
                 setting_name, _, value = line.partition('=')
                 wiki_settings[setting_name.strip()] = ast.literal_eval(value.strip())
             
-            self.settings = {
-                    key: wiki_settings.get(key, default_settings[key])
-                    for key in default_settings
-            }
-            
         except prawcore.exceptions.NotFound:
-            self.settings = {
+            pass
+
+        self.settings = {
                 key: wiki_settings.get(key, default_settings[key])
                 for key in default_settings
-            }
-        
+        }        
 
         for setting in ['domain_whitelist','user_whitelist','watchers']:
             self.settings[setting] = set(self.settings[setting])
