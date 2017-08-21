@@ -44,8 +44,15 @@ class SpamCheck(object):
         wiki_settings = {}
         
         try:
+            
             wiki = reddit.subreddit(self.subreddit).wiki['spaminator'].content_md
+            wiki = wiki.splitlines()
+
             for line in wiki:
+                
+                if '=' not in line:
+                    continue
+                
                 setting_name, _, value = line.partition('=')
                 wiki_settings[setting_name.strip()] = ast.literal_eval(value.strip())
             
