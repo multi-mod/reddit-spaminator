@@ -140,36 +140,38 @@ class SpamCheck(object):
             if post.media is None:
                 continue
             try:
-                post.media['oembed']['author_name']
+                post.media['oembed']['author_url']
             except KeyError:
                 continue
 
             author_submissions = list(post.author.submissions.new(limit=limit))
-            
             if len(author_submissions) == 0:
                 continue
             
             media_submissions = [x.media for x in author_submissions if x.media is not None]
-            
             if len(media_submissions) == 0:
                 continue
             
             media_authors = []
             for submission in media_submissions:
+                
+                if submission['type'] is not post['type']:
+                    continue
+                
                 try:
-                    media_authors.append(submission['oembed']['author_name'])
+                    media_authors.append(submission['oembed']['author_url'])
                 except KeyError:
                     pass
                 except TypeError:
                     pass
             
             self.total_submissions = len(author_submissions)
-            media_author_submissions = media_authors.count(post.media['oembed']['author_name'])
+            media_author_submissions = media_authors.count(post.media['oembed']['author_url'])
             
             self.percentage = int((media_author_submissions / self.total_submissions) * 100)
             
             if self.should_report():
-                report_reason = 'media spam: ' + post.media['oembed']['author_name'] + ' ' + str(self.percentage) + '%'
+                report_reason = 'media channel spam: ' + str(self.percentage) + '%'
                 post.report(reason=report_reason)
                         
             if self.should_remove():
