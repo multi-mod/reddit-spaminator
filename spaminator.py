@@ -155,7 +155,7 @@ class SpamCheck(object):
             media_authors = []
             for submission in media_submissions:
                 
-                if submission['type'] is not post['type']:
+                if submission['type'] is not post.media['type']:
                     continue
                 
                 try:
