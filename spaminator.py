@@ -16,7 +16,11 @@ reddit = praw.Reddit(client_id='',
 def subreddit_list():
 
     subreddit_list = os.path.join(os.getcwd(), 'subreddit_list.txt')
-
+    
+    while not os.path.isfile(subreddit_list):
+        print('subreddit list file not found, sleeping 60 seconds')
+        time.sleep(60)
+        
     with open(subreddit_list) as f:
         subs = [x for x in f][0]
     subs = ast.literal_eval(subs)
