@@ -22,7 +22,7 @@ def subreddit_list():
         time.sleep(60)
         
     with open(subreddit_list) as f:
-        subs = [x for x in f][0]
+        subs = list(f)[0]
     subs = ast.literal_eval(subs)
 
     return(subs)
