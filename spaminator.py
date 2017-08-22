@@ -260,13 +260,12 @@ if __name__ == '__main__':
     while True:
         
         try:
-            if subreddits is None:
-                subreddits = subreddit_list()
+
+            new_list_check = subreddit_list()
+            if new_list_check != subreddits:
+                subreddits = new_list_check
+                spam_checkers = None
                 spam_checkers = {subreddit: SpamCheck(subreddit) for subreddit in subreddits}
-            else:
-                new_list_check = subreddit_list()
-                if new_list_check != subreddits:
-                    spam_checkers = {subreddit: SpamCheck(subreddit) for subreddit in subreddits}
     
             for subreddit in subreddits:
                 spam_checkers[subreddit].get_settings()
