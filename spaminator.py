@@ -264,7 +264,6 @@ if __name__ == '__main__':
             new_list_check = subreddit_list()
             if new_list_check != subreddits:
                 subreddits = new_list_check
-                spam_checkers = None
                 spam_checkers = {subreddit: SpamCheck(subreddit) for subreddit in subreddits}
     
             for subreddit in subreddits:
